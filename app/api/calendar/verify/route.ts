@@ -1,18 +1,20 @@
 import { NextRequest, NextResponse } from "next/server"
-import { promises as fs } from "fs"
-import path from "path"
+import { list } from "@vercel/blob"
 import { getDefaultConfig } from "@/lib/calendar-data"
 
-const DATA_FILE = path.join(process.cwd(), "data", "calendar.json")
+const BLOB_CONFIG_PATH = "calendar-config.json"
 
 async function readConfig() {
   try {
-    await fs.access(DATA_FILE)
-    const raw = await fs.readFile(DATA_FILE, "utf-8")
-    return JSON.parse(raw)
-  } catch {
-    return getDefaultConfig()
+    const { blobs } = await list({ prefix: BLOB_CONFIG_PATH })
+    if (blobs.length > 0) {
+      const res = await fetch(blobs[0].url)
+      return await res.json()
+    }
+  } catch (err) {
+    console.error("Error reading config from blob:", err)
   }
+  return getDefaultConfig()
 }
 
 export async function POST(request: NextRequest) {
