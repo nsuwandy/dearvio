@@ -513,13 +513,13 @@ export default function AdminPage() {
                   <input
                     id="slideshow-upload"
                     type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    accept="image/*"
                     onChange={handleImageUpload}
                     disabled={uploading}
                     className="hidden"
                   />
                   <span className="text-xs text-muted-foreground">
-                    JPG, PNG, WebP, or GIF
+                    JPG, PNG, WebP, GIF, or HEIC
                   </span>
                 </div>
               </div>
