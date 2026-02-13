@@ -15,7 +15,7 @@ export default function AdminPage() {
   const [saved, setSaved] = useState(false)
   const [expandedLetter, setExpandedLetter] = useState<number | null>(null)
   const [activeTab, setActiveTab] = useState<"settings" | "letters" | "slideshow">("settings")
-  const [slideshowImages, setSlideshowImages] = useState<string[]>([])
+  const [slideshowImages, setSlideshowImages] = useState<{ url: string; filename: string }[]>([])
   const [uploading, setUploading] = useState(false)
   const [deletingImage, setDeletingImage] = useState<string | null>(null)
 
@@ -70,13 +70,13 @@ export default function AdminPage() {
     }
   }
 
-  async function handleImageDelete(filename: string) {
-    setDeletingImage(filename)
+  async function handleImageDelete(url: string) {
+    setDeletingImage(url)
     try {
       const res = await fetch("/api/slideshow", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename }),
+        body: JSON.stringify({ url }),
       })
       const data = await res.json()
       if (data.images) {
@@ -438,26 +438,26 @@ export default function AdminPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                  {slideshowImages.map((filename) => (
+                  {slideshowImages.map((image) => (
                     <div
-                      key={filename}
+                      key={image.url}
                       className="group relative overflow-hidden rounded-lg border border-border bg-secondary/30"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={`/images/slideshow/${filename}`}
+                        src={image.url}
                         alt="Slideshow image"
                         className="aspect-square w-full object-cover"
                       />
                       <button
-                        onClick={() => handleImageDelete(filename)}
-                        disabled={deletingImage === filename}
+                        onClick={() => handleImageDelete(image.url)}
+                        disabled={deletingImage === image.url}
                         className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-destructive/90 text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-destructive disabled:opacity-50"
-                        aria-label={`Delete ${filename}`}
+                        aria-label={`Delete ${image.filename}`}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
-                      {deletingImage === filename && (
+                      {deletingImage === image.url && (
                         <div className="absolute inset-0 flex items-center justify-center bg-card/70">
                           <span className="text-xs text-muted-foreground">Deleting...</span>
                         </div>

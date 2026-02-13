@@ -2,8 +2,10 @@
 
 import { useEffect, useState, useCallback, useRef } from "react"
 
-interface SlideshowData {
-  images: string[]
+interface SlideshowImage {
+  url: string
+  pathname: string
+  filename: string
 }
 
 function shuffleArray<T>(arr: T[]): T[] {
@@ -16,7 +18,7 @@ function shuffleArray<T>(arr: T[]): T[] {
 }
 
 export function HomepageSlideshow() {
-  const [images, setImages] = useState<string[]>([])
+  const [images, setImages] = useState<SlideshowImage[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -24,8 +26,8 @@ export function HomepageSlideshow() {
   const fetchImages = useCallback(async () => {
     try {
       const res = await fetch("/api/slideshow")
-      const data: SlideshowData = await res.json()
-      if (data.images.length > 0) {
+      const data = await res.json()
+      if (data.images && data.images.length > 0) {
         setImages(shuffleArray(data.images))
         setCurrentIndex(0)
       }
@@ -46,7 +48,7 @@ export function HomepageSlideshow() {
       setTimeout(() => {
         setCurrentIndex((prev) => (prev + 1) % images.length)
         setIsTransitioning(false)
-      }, 500) // Half-second fade out, then switch and fade in
+      }, 500)
     }, 15000)
 
     return () => {
@@ -66,7 +68,7 @@ export function HomepageSlideshow() {
       <div className="relative overflow-hidden rounded-2xl shadow-lg">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={`/images/slideshow/${currentImage}`}
+          src={currentImage.url}
           alt="Slideshow photo"
           className="h-auto w-[110px] rounded-2xl object-cover sm:w-[150px] transition-opacity duration-500"
           style={{ opacity: isTransitioning ? 0 : 1 }}

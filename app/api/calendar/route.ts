@@ -1,35 +1,28 @@
 import { NextRequest, NextResponse } from "next/server"
-import { promises as fs } from "fs"
-import path from "path"
+import { put, list } from "@vercel/blob"
 import { getDefaultConfig, type CalendarConfig } from "@/lib/calendar-data"
 
-const DATA_FILE = path.join(process.cwd(), "data", "calendar.json")
-
-async function ensureDataDir() {
-  const dir = path.dirname(DATA_FILE)
-  try {
-    await fs.access(dir)
-  } catch {
-    await fs.mkdir(dir, { recursive: true })
-  }
-}
+const BLOB_CONFIG_PATH = "calendar-config.json"
 
 async function readConfig(): Promise<CalendarConfig> {
   try {
-    await fs.access(DATA_FILE)
-    const raw = await fs.readFile(DATA_FILE, "utf-8")
-    return JSON.parse(raw)
-  } catch {
-    const config = getDefaultConfig()
-    await ensureDataDir()
-    await fs.writeFile(DATA_FILE, JSON.stringify(config, null, 2))
-    return config
+    const { blobs } = await list({ prefix: BLOB_CONFIG_PATH })
+    if (blobs.length > 0) {
+      const res = await fetch(blobs[0].url)
+      return await res.json()
+    }
+  } catch (err) {
+    console.error("Error reading config from blob:", err)
   }
+  return getDefaultConfig()
 }
 
 async function writeConfig(config: CalendarConfig) {
-  await ensureDataDir()
-  await fs.writeFile(DATA_FILE, JSON.stringify(config, null, 2))
+  await put(BLOB_CONFIG_PATH, JSON.stringify(config, null, 2), {
+    access: "public",
+    addRandomSuffix: false,
+    contentType: "application/json",
+  })
 }
 
 export async function GET() {

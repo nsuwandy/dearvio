@@ -1,43 +1,21 @@
 import { NextRequest, NextResponse } from "next/server"
-import { promises as fs } from "fs"
-import path from "path"
+import { put, del, list } from "@vercel/blob"
 
-const DATA_FILE = path.join(process.cwd(), "data", "slideshow.json")
-const UPLOAD_DIR = path.join(process.cwd(), "public", "images", "slideshow")
-
-interface SlideshowData {
-  images: string[]
-}
-
-async function ensureDir(dir: string) {
-  try {
-    await fs.access(dir)
-  } catch {
-    await fs.mkdir(dir, { recursive: true })
-  }
-}
-
-async function readData(): Promise<SlideshowData> {
-  try {
-    await fs.access(DATA_FILE)
-    const raw = await fs.readFile(DATA_FILE, "utf-8")
-    return JSON.parse(raw)
-  } catch {
-    const data: SlideshowData = { images: [] }
-    await ensureDir(path.dirname(DATA_FILE))
-    await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2))
-    return data
-  }
-}
-
-async function writeData(data: SlideshowData) {
-  await ensureDir(path.dirname(DATA_FILE))
-  await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2))
-}
+const SLIDESHOW_PREFIX = "slideshow/"
 
 export async function GET() {
-  const data = await readData()
-  return NextResponse.json(data)
+  try {
+    const { blobs } = await list({ prefix: SLIDESHOW_PREFIX })
+    const images = blobs.map((blob) => ({
+      url: blob.url,
+      pathname: blob.pathname,
+      filename: blob.pathname.replace(SLIDESHOW_PREFIX, ""),
+    }))
+    return NextResponse.json({ images })
+  } catch (err) {
+    console.error("Error listing slideshow images:", err)
+    return NextResponse.json({ images: [] })
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -60,17 +38,21 @@ export async function POST(request: NextRequest) {
     const ext = file.name.split(".").pop() || "jpg"
     const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
 
-    await ensureDir(UPLOAD_DIR)
+    const blob = await put(`${SLIDESHOW_PREFIX}${filename}`, file, {
+      access: "public",
+    })
 
-    const buffer = Buffer.from(await file.arrayBuffer())
-    await fs.writeFile(path.join(UPLOAD_DIR, filename), buffer)
+    // Re-fetch the full list
+    const { blobs } = await list({ prefix: SLIDESHOW_PREFIX })
+    const images = blobs.map((b) => ({
+      url: b.url,
+      pathname: b.pathname,
+      filename: b.pathname.replace(SLIDESHOW_PREFIX, ""),
+    }))
 
-    const data = await readData()
-    data.images.push(filename)
-    await writeData(data)
-
-    return NextResponse.json({ filename, images: data.images })
-  } catch {
+    return NextResponse.json({ uploaded: blob.url, images })
+  } catch (err) {
+    console.error("Upload error:", err)
     return NextResponse.json({ error: "Upload failed" }, { status: 500 })
   }
 }
@@ -78,30 +60,25 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const body = await request.json()
-    const { filename } = body
+    const { url } = body
 
-    if (!filename || typeof filename !== "string") {
-      return NextResponse.json({ error: "Invalid filename" }, { status: 400 })
+    if (!url || typeof url !== "string") {
+      return NextResponse.json({ error: "Invalid URL" }, { status: 400 })
     }
 
-    // Prevent path traversal
-    if (filename.includes("/") || filename.includes("\\") || filename.includes("..")) {
-      return NextResponse.json({ error: "Invalid filename" }, { status: 400 })
-    }
+    await del(url)
 
-    const filePath = path.join(UPLOAD_DIR, filename)
-    try {
-      await fs.unlink(filePath)
-    } catch {
-      // File may already be deleted, continue to remove from data
-    }
+    // Re-fetch the full list
+    const { blobs } = await list({ prefix: SLIDESHOW_PREFIX })
+    const images = blobs.map((b) => ({
+      url: b.url,
+      pathname: b.pathname,
+      filename: b.pathname.replace(SLIDESHOW_PREFIX, ""),
+    }))
 
-    const data = await readData()
-    data.images = data.images.filter((img) => img !== filename)
-    await writeData(data)
-
-    return NextResponse.json({ images: data.images })
-  } catch {
+    return NextResponse.json({ images })
+  } catch (err) {
+    console.error("Delete error:", err)
     return NextResponse.json({ error: "Delete failed" }, { status: 500 })
   }
 }
