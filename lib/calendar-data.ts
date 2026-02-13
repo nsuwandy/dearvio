@@ -5,6 +5,13 @@ export interface Letter {
   unlockDate: string // ISO date string YYYY-MM-DD
 }
 
+export interface Archive {
+  id: string // e.g. "2026-03"
+  label: string // e.g. "March 2026"
+  archivedAt: string // ISO timestamp
+  config: CalendarConfig
+}
+
 export interface CalendarConfig {
   totalDays: number
   startDate: string // ISO date string YYYY-MM-DD
