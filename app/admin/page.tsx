@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Save, RotateCcw, ChevronDown, ChevronUp, Settings, FileText, ImageIcon, Upload, Trash2, Archive } from "lucide-react"
+import { Save, RotateCcw, ChevronDown, ChevronUp, Settings, FileText, ImageIcon, Upload, Trash2, Archive, Pencil, FolderArchive, Plus, Check, X } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import type { CalendarConfig, Letter } from "@/lib/calendar-data"
+import type { CalendarConfig, Letter, Archive as ArchiveType } from "@/lib/calendar-data"
 
 export default function AdminPage() {
   const [config, setConfig] = useState<CalendarConfig | null>(null)
@@ -25,10 +25,17 @@ export default function AdminPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [expandedLetter, setExpandedLetter] = useState<number | null>(null)
-  const [activeTab, setActiveTab] = useState<"settings" | "letters" | "slideshow">("settings")
+  const [activeTab, setActiveTab] = useState<"settings" | "letters" | "slideshow" | "archives">("settings")
   const [slideshowImages, setSlideshowImages] = useState<{ url: string; filename: string }[]>([])
   const [uploading, setUploading] = useState(false)
   const [deletingImage, setDeletingImage] = useState<string | null>(null)
+  const [archives, setArchives] = useState<Omit<ArchiveType, "config">[]>([])
+  const [archivesLoading, setArchivesLoading] = useState(false)
+  const [archiving, setArchiving] = useState(false)
+  const [archiveName, setArchiveName] = useState("")
+  const [renamingArchive, setRenamingArchive] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState("")
+  const [deletingArchive, setDeletingArchive] = useState<string | null>(null)
 
   const fetchConfig = useCallback(async () => {
     try {
@@ -52,10 +59,24 @@ export default function AdminPage() {
     }
   }, [])
 
+  const fetchArchives = useCallback(async () => {
+    setArchivesLoading(true)
+    try {
+      const res = await fetch("/api/archives")
+      const data = await res.json()
+      setArchives(data.archives || [])
+    } catch (err) {
+      console.error("Failed to load archives:", err)
+    } finally {
+      setArchivesLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     fetchConfig()
     fetchSlideshow()
-  }, [fetchConfig, fetchSlideshow])
+    fetchArchives()
+  }, [fetchConfig, fetchSlideshow, fetchArchives])
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -152,6 +173,60 @@ export default function AdminPage() {
         l.day === day ? { ...l, [field]: field === "day" ? parseInt(value) : value } : l
       ),
     })
+  }
+
+  async function handleCreateArchive() {
+    if (!config) return
+    setArchiving(true)
+    try {
+      const res = await fetch("/api/archives", { method: "POST" })
+      const data = await res.json()
+      if (data.config) {
+        setConfig(data.config)
+      }
+      // If a custom name was provided, rename the archive
+      if (archiveName.trim() && data.archive?.id) {
+        await fetch(`/api/archives/${data.archive.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ label: archiveName.trim() }),
+        })
+      }
+      setArchiveName("")
+      await fetchArchives()
+    } catch (err) {
+      console.error("Failed to create archive:", err)
+    } finally {
+      setArchiving(false)
+    }
+  }
+
+  async function handleRenameArchive(id: string) {
+    if (!renameValue.trim()) return
+    try {
+      await fetch(`/api/archives/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: renameValue.trim() }),
+      })
+      setRenamingArchive(null)
+      setRenameValue("")
+      await fetchArchives()
+    } catch (err) {
+      console.error("Failed to rename archive:", err)
+    }
+  }
+
+  async function handleDeleteArchive(id: string) {
+    setDeletingArchive(id)
+    try {
+      await fetch(`/api/archives/${id}`, { method: "DELETE" })
+      await fetchArchives()
+    } catch (err) {
+      console.error("Failed to delete archive:", err)
+    } finally {
+      setDeletingArchive(null)
+    }
   }
 
   function handleTotalDaysChange(newTotal: number) {
@@ -265,6 +340,17 @@ export default function AdminPage() {
           >
             <ImageIcon className="h-4 w-4" />
             Slideshow
+          </button>
+          <button
+            onClick={() => setActiveTab("archives")}
+            className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              activeTab === "archives"
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Archive className="h-4 w-4" />
+            Archives
           </button>
         </div>
 
@@ -482,6 +568,186 @@ export default function AdminPage() {
                 <p className="mt-4 text-xs text-muted-foreground">
                   {slideshowImages.length} image{slideshowImages.length !== 1 ? "s" : ""} uploaded. Hover over an image to delete it.
                 </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Archives Tab */}
+        {activeTab === "archives" && (
+          <div className="flex flex-col gap-6 animate-in fade-in duration-300">
+            {/* Create Archive */}
+            <div className="rounded-xl border border-border bg-card p-5 sm:p-6">
+              <h2 className="mb-2 font-serif text-lg font-semibold text-foreground">
+                Create Archive
+              </h2>
+              <p className="mb-4 text-sm text-muted-foreground leading-relaxed">
+                Snapshot the current letters into an archive folder. This will reset all letters to placeholder text.
+              </p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <Label htmlFor="archiveName" className="text-foreground">Folder Name</Label>
+                  <Input
+                    id="archiveName"
+                    type="text"
+                    placeholder={new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                    value={archiveName}
+                    onChange={(e) => setArchiveName(e.target.value)}
+                    className="border-border bg-background text-foreground placeholder:text-muted-foreground"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Leave empty to use the default month name.
+                  </p>
+                </div>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      size="sm"
+                      disabled={archiving}
+                      className="bg-primary text-primary-foreground hover:bg-blush/80"
+                    >
+                      <Plus className="mr-1.5 h-3.5 w-3.5" />
+                      {archiving ? "Archiving..." : "Create Archive"}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="bg-card border-border">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="font-serif text-foreground">Archive current letters?</AlertDialogTitle>
+                      <AlertDialogDescription className="text-muted-foreground leading-relaxed">
+                        This will snapshot all current letters into an archive folder and reset every letter to placeholder text. This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="border-border text-foreground hover:bg-secondary">Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleCreateArchive}
+                        className="bg-primary text-primary-foreground hover:bg-blush/80"
+                      >
+                        Archive &amp; Reset
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </div>
+
+            {/* Archives List */}
+            <div className="rounded-xl border border-border bg-card p-5 sm:p-6">
+              <h2 className="mb-4 font-serif text-lg font-semibold text-foreground">
+                Saved Archives
+              </h2>
+
+              {archivesLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-pulse text-muted-foreground text-sm">Loading archives...</div>
+                </div>
+              ) : archives.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-12">
+                  <FolderArchive className="mb-3 h-10 w-10 text-muted-foreground/40" />
+                  <p className="text-sm text-muted-foreground">No archives yet</p>
+                  <p className="mt-1 text-xs text-muted-foreground/60">
+                    Create your first archive above
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {archives.map((archive) => (
+                    <div
+                      key={archive.id}
+                      className="flex items-center justify-between rounded-lg border border-border bg-background p-4 transition-colors hover:bg-secondary/30"
+                    >
+                      <div className="flex-1 min-w-0">
+                        {renamingArchive === archive.id ? (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              value={renameValue}
+                              onChange={(e) => setRenameValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleRenameArchive(archive.id)
+                                if (e.key === "Escape") {
+                                  setRenamingArchive(null)
+                                  setRenameValue("")
+                                }
+                              }}
+                              className="h-8 border-border bg-card text-foreground text-sm"
+                              autoFocus
+                            />
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleRenameArchive(archive.id)}
+                              className="h-8 w-8 p-0 text-foreground hover:bg-secondary"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => { setRenamingArchive(null); setRenameValue("") }}
+                              className="h-8 w-8 p-0 text-muted-foreground hover:bg-secondary"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="font-serif font-medium text-foreground truncate">{archive.label}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Archived {new Date(archive.archivedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                            </p>
+                          </>
+                        )}
+                      </div>
+
+                      {renamingArchive !== archive.id && (
+                        <div className="flex items-center gap-1 ml-3">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setRenamingArchive(archive.id)
+                              setRenameValue(archive.label)
+                            }}
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-secondary"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            <span className="sr-only">Rename archive</span>
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={deletingArchive === archive.id}
+                                className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                <span className="sr-only">Delete archive</span>
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="bg-card border-border">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle className="font-serif text-foreground">Delete &ldquo;{archive.label}&rdquo;?</AlertDialogTitle>
+                                <AlertDialogDescription className="text-muted-foreground leading-relaxed">
+                                  This will permanently delete this archive and all its letters. This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel className="border-border text-foreground hover:bg-secondary">Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteArchive(archive.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/80"
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </div>

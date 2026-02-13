@@ -7,13 +7,15 @@ import { SparkleEffect } from "./sparkle-effect"
 
 interface CalendarGridProps {
   letters: Letter[]
+  readOnly?: boolean
+  archiveId?: string
 }
 
-export function CalendarGrid({ letters }: CalendarGridProps) {
+export function CalendarGrid({ letters, readOnly = false, archiveId }: CalendarGridProps) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
       {letters.map((letter) => {
-        const unlocked = isLetterUnlocked(letter.unlockDate)
+        const unlocked = readOnly ? true : isLetterUnlocked(letter.unlockDate)
         const isLast = letter.day === letters.length
 
         return (
@@ -22,6 +24,8 @@ export function CalendarGrid({ letters }: CalendarGridProps) {
             letter={letter}
             unlocked={unlocked}
             isLast={isLast}
+            readOnly={readOnly}
+            archiveId={archiveId}
           />
         )
       })}
@@ -33,10 +37,14 @@ function CalendarCard({
   letter,
   unlocked,
   isLast,
+  readOnly = false,
+  archiveId,
 }: {
   letter: Letter
   unlocked: boolean
   isLast: boolean
+  readOnly?: boolean
+  archiveId?: string
 }) {
   const cardContent = (
     <div
@@ -64,7 +72,7 @@ function CalendarCard({
             Day {letter.day}
           </span>
           <span className="mt-1 text-[11px] text-muted-foreground sm:text-xs">
-            Open me
+            {readOnly ? "Archived" : "Open me"}
           </span>
           {unlocked && (
             <div className="absolute inset-0 rounded-xl opacity-0 transition-opacity duration-300 group-hover:opacity-100 bg-gold/5" />
@@ -85,8 +93,11 @@ function CalendarCard({
   )
 
   if (unlocked) {
+    const href = readOnly && archiveId
+      ? `/archive/${archiveId}/letter/${letter.day}`
+      : `/letter/${letter.day}`
     return (
-      <Link href={`/letter/${letter.day}`} className="animate-in fade-in duration-500">
+      <Link href={href} className="animate-in fade-in duration-500">
         {cardContent}
       </Link>
     )
