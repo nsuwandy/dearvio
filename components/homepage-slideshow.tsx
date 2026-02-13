@@ -75,25 +75,24 @@ export function HomepageSlideshow() {
   return (
     <>
       {/* Thumbnail */}
-      <div
-        className="fixed bottom-4 left-4 z-50 select-none cursor-pointer pointer-events-auto"
-        style={{ zIndex: 50 }}
+      <button
+        type="button"
+        className="fixed bottom-4 left-4 z-50 pointer-events-auto appearance-none border-0 bg-transparent p-0 outline-none"
+        style={{ zIndex: 50, WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
         onClick={() => setExpanded(true)}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setExpanded(true) }}
         aria-label="View photo fullscreen"
       >
         <div className="relative overflow-hidden rounded-2xl shadow-lg">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={currentImage.url}
-            alt="Slideshow photo"
+            alt=""
             className="h-auto w-[110px] rounded-2xl object-cover sm:w-[150px] transition-opacity duration-500"
-            style={{ opacity: isTransitioning ? 0 : 1 }}
+            style={{ opacity: isTransitioning ? 0 : 1, pointerEvents: "none" }}
+            draggable={false}
           />
         </div>
-      </div>
+      </button>
 
       {/* Fullscreen Lightbox */}
       {expanded && (
@@ -102,13 +101,16 @@ export function HomepageSlideshow() {
           onClick={() => setExpanded(false)}
           role="dialog"
           aria-label="Fullscreen photo viewer"
+          style={{ touchAction: "manipulation" }}
         >
           <button
+            type="button"
             onClick={(e) => { e.stopPropagation(); setExpanded(false) }}
-            className="absolute top-4 right-4 z-[101] flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white/90 transition-colors hover:bg-black/70 hover:text-white"
+            className="absolute top-4 right-4 z-[101] flex h-12 w-12 items-center justify-center rounded-full bg-black/50 text-white/90 transition-colors hover:bg-black/70 hover:text-white"
+            style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
             aria-label="Close fullscreen view"
           >
-            <X className="h-5 w-5" />
+            <X className="h-6 w-6" />
           </button>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -116,6 +118,8 @@ export function HomepageSlideshow() {
             alt="Slideshow photo fullscreen"
             className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain shadow-2xl animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
+            draggable={false}
+            style={{ pointerEvents: "none" }}
           />
         </div>
       )}
