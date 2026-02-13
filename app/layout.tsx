@@ -7,8 +7,8 @@ const _lora = Lora({ subsets: ['latin'], variable: '--font-lora' })
 const _playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-playfair' })
 
 export const metadata: Metadata = {
-  title: 'For You',
-  description: 'A private love letter calendar',
+  title: 'Dear Vio',
+  description: 'A love letter advent calendar',
   robots: {
     index: false,
     follow: false,

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Save, RotateCcw, ChevronDown, ChevronUp, Settings, FileText } from "lucide-react"
+import { Save, RotateCcw, ChevronDown, ChevronUp, Settings, FileText, ImageIcon, Upload, Trash2 } from "lucide-react"
 import type { CalendarConfig, Letter } from "@/lib/calendar-data"
 
 export default function AdminPage() {
@@ -14,7 +14,10 @@ export default function AdminPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [expandedLetter, setExpandedLetter] = useState<number | null>(null)
-  const [activeTab, setActiveTab] = useState<"settings" | "letters">("settings")
+  const [activeTab, setActiveTab] = useState<"settings" | "letters" | "slideshow">("settings")
+  const [slideshowImages, setSlideshowImages] = useState<{ url: string; filename: string }[]>([])
+  const [uploading, setUploading] = useState(false)
+  const [deletingImage, setDeletingImage] = useState<string | null>(null)
 
   const fetchConfig = useCallback(async () => {
     try {
@@ -28,9 +31,63 @@ export default function AdminPage() {
     }
   }, [])
 
+  const fetchSlideshow = useCallback(async () => {
+    try {
+      const res = await fetch("/api/slideshow")
+      const data = await res.json()
+      setSlideshowImages(data.images || [])
+    } catch (err) {
+      console.error("Failed to load slideshow:", err)
+    }
+  }, [])
+
   useEffect(() => {
     fetchConfig()
-  }, [fetchConfig])
+    fetchSlideshow()
+  }, [fetchConfig, fetchSlideshow])
+
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+      const res = await fetch("/api/slideshow", {
+        method: "POST",
+        body: formData,
+      })
+      const data = await res.json()
+      if (data.images) {
+        setSlideshowImages(data.images)
+      }
+    } catch (err) {
+      console.error("Failed to upload image:", err)
+    } finally {
+      setUploading(false)
+      e.target.value = ""
+    }
+  }
+
+  async function handleImageDelete(url: string) {
+    setDeletingImage(url)
+    try {
+      const res = await fetch("/api/slideshow", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      })
+      const data = await res.json()
+      if (data.images) {
+        setSlideshowImages(data.images)
+      }
+    } catch (err) {
+      console.error("Failed to delete image:", err)
+    } finally {
+      setDeletingImage(null)
+    }
+  }
 
   async function handleSave() {
     if (!config) return
@@ -187,6 +244,17 @@ export default function AdminPage() {
             <FileText className="h-4 w-4" />
             Letters
           </button>
+          <button
+            onClick={() => setActiveTab("slideshow")}
+            className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              activeTab === "slideshow"
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <ImageIcon className="h-4 w-4" />
+            Slideshow
+          </button>
         </div>
 
         {/* Settings Tab */}
@@ -319,6 +387,92 @@ export default function AdminPage() {
                 )}
               </div>
             ))}
+          </div>
+        )}
+        {/* Slideshow Tab */}
+        {activeTab === "slideshow" && (
+          <div className="flex flex-col gap-6 animate-in fade-in duration-300">
+            <div className="rounded-xl border border-border bg-card p-5 sm:p-6">
+              <h2 className="mb-4 font-serif text-lg font-semibold text-foreground">
+                Slideshow Images
+              </h2>
+              <p className="mb-4 text-sm text-muted-foreground leading-relaxed">
+                Upload images to display in the homepage slideshow. Images will shuffle and cycle every 15 seconds.
+              </p>
+
+              {/* Upload area */}
+              <div className="mb-6">
+                <Label htmlFor="slideshow-upload" className="sr-only">Upload image</Label>
+                <div className="flex items-center gap-3">
+                  <label
+                    htmlFor="slideshow-upload"
+                    className={`flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border px-4 py-3 text-sm font-medium transition-colors hover:bg-secondary/50 ${
+                      uploading ? "opacity-50 pointer-events-none" : "text-foreground"
+                    }`}
+                  >
+                    <Upload className="h-4 w-4 text-muted-foreground" />
+                    {uploading ? "Uploading..." : "Choose image"}
+                  </label>
+                  <input
+                    id="slideshow-upload"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={handleImageUpload}
+                    disabled={uploading}
+                    className="hidden"
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    JPG, PNG, WebP, or GIF
+                  </span>
+                </div>
+              </div>
+
+              {/* Image grid */}
+              {slideshowImages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-12">
+                  <ImageIcon className="mb-3 h-10 w-10 text-muted-foreground/40" />
+                  <p className="text-sm text-muted-foreground">No images uploaded yet</p>
+                  <p className="mt-1 text-xs text-muted-foreground/60">
+                    Upload images above to create a slideshow
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                  {slideshowImages.map((image) => (
+                    <div
+                      key={image.url}
+                      className="group relative overflow-hidden rounded-lg border border-border bg-secondary/30"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={image.url}
+                        alt="Slideshow image"
+                        className="aspect-square w-full object-cover"
+                      />
+                      <button
+                        onClick={() => handleImageDelete(image.url)}
+                        disabled={deletingImage === image.url}
+                        className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-destructive/90 text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-destructive disabled:opacity-50"
+                        aria-label={`Delete ${image.filename}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                      {deletingImage === image.url && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-card/70">
+                          <span className="text-xs text-muted-foreground">Deleting...</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {slideshowImages.length > 0 && (
+                <p className="mt-4 text-xs text-muted-foreground">
+                  {slideshowImages.length} image{slideshowImages.length !== 1 ? "s" : ""} uploaded. Hover over an image to delete it.
+                </p>
+              )}
+            </div>
           </div>
         )}
       </main>

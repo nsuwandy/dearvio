@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react"
 import { CalendarGrid } from "@/components/calendar-grid"
 import { FloatingHearts } from "@/components/floating-hearts"
 import { PasswordGate } from "@/components/password-gate"
-import { SleepingSamoyed } from "@/components/sleeping-samoyed"
+import { HomepageSlideshow } from "@/components/homepage-slideshow"
 import type { CalendarConfig } from "@/lib/calendar-data"
 
 export default function Home() {
@@ -65,7 +65,7 @@ export default function Home() {
   return (
     <div className="relative min-h-screen bg-background">
       <FloatingHearts />
-      <SleepingSamoyed />
+      <HomepageSlideshow />
 
       <main className="relative z-10 mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
         <header className="mb-8 text-center animate-in fade-in slide-in-from-bottom-4 duration-700 sm:mb-12">
@@ -75,7 +75,7 @@ export default function Home() {
             </svg>
           </div>
           <h1 className="font-serif text-3xl font-bold tracking-wide text-foreground sm:text-4xl md:text-5xl text-balance">
-            For You
+            Dear Vio
           </h1>
           <div className="mx-auto mt-4 h-px w-24 bg-gold/40" />
           <p className="mt-4 text-sm text-muted-foreground leading-relaxed sm:text-base">
