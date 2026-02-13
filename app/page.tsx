@@ -75,7 +75,7 @@ export default function Home() {
             </svg>
           </div>
           <h1 className="font-serif text-3xl font-bold tracking-wide text-foreground sm:text-4xl md:text-5xl text-balance">
-            For You
+            Dear Vio
           </h1>
           <div className="mx-auto mt-4 h-px w-24 bg-gold/40" />
           <p className="mt-4 text-sm text-muted-foreground leading-relaxed sm:text-base">
