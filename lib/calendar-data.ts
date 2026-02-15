@@ -19,6 +19,8 @@ export interface CalendarConfig {
   letters: Letter[]
 }
 
+const SITE_TIME_ZONE = process.env.NEXT_PUBLIC_SITE_TIME_ZONE || "UTC"
+
 export function getDefaultConfig(): CalendarConfig {
   const startDate = "2026-03-01"
   const totalDays = 25
@@ -46,8 +48,32 @@ export function getDefaultConfig(): CalendarConfig {
 
 export function isLetterUnlocked(unlockDate: string): boolean {
   const now = new Date()
-  const unlock = new Date(unlockDate + "T00:00:00")
-  return now >= unlock
+  let parts: Intl.DateTimeFormatPart[]
+
+  try {
+    parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: SITE_TIME_ZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(now)
+  } catch {
+    parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "UTC",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(now)
+  }
+
+  const year = parts.find((p) => p.type === "year")?.value
+  const month = parts.find((p) => p.type === "month")?.value
+  const day = parts.find((p) => p.type === "day")?.value
+
+  if (!year || !month || !day) return false
+
+  const todayInSiteTimeZone = `${year}-${month}-${day}`
+  return todayInSiteTimeZone >= unlockDate
 }
 
 export function formatDate(dateStr: string): string {

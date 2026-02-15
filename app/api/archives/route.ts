@@ -39,9 +39,7 @@ export async function GET() {
         return {
           id: filename,
           label: format(date, "MMMM yyyy"),
-          archivedAt: blob.uploadedAt.toISOString
-            ? blob.uploadedAt.toString()
-            : new Date(blob.uploadedAt).toISOString(),
+          archivedAt: new Date(blob.uploadedAt).toISOString(),
         }
       })
       .sort((a, b) => b.id.localeCompare(a.id))
