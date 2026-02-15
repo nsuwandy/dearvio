@@ -6,7 +6,42 @@ import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { FloatingHearts } from "@/components/floating-hearts"
 import { ConfettiEffect } from "@/components/confetti-effect"
-import { isLetterUnlocked, formatDate, type CalendarConfig, type Letter } from "@/lib/calendar-data"
+import { formatDate, type CalendarConfig, type Letter } from "@/lib/calendar-data"
+
+
+const LOCK_TIMEZONE = "Asia/Tokyo"
+
+function ymdInTimeZone(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date)
+
+  const get = (type: string) => parts.find((p) => p.type === type)?.value
+  const y = get("year")
+  const m = get("month")
+  const d = get("day")
+
+  // Defensive fallback (should never happen)
+  if (!y || !m || !d) return "0000-00-00"
+
+  // yyyy-mm-dd so lexicographic comparison works
+  return `${y}-${m}-${d}`
+}
+
+function isLetterUnlockedInTimeZone(unlockDate: string | Date, timeZone: string) {
+  const now = new Date()
+  const nowYmd = ymdInTimeZone(now, timeZone)
+
+  // If unlockDate is a string like "2026-12-01", treat it as a calendar day in the target timezone.
+  // If it includes a time, we still reduce to the day in that timezone.
+  const unlock = typeof unlockDate === "string" ? new Date(unlockDate) : unlockDate
+  const unlockYmd = ymdInTimeZone(unlock, timeZone)
+
+  return nowYmd >= unlockYmd
+}
 
 export default function LetterPage({ params }: { params: Promise<{ day: string }> }) {
   const { day: dayParam } = use(params)
@@ -31,7 +66,7 @@ export default function LetterPage({ params }: { params: Promise<{ day: string }
           return
         }
 
-        if (!isLetterUnlocked(found.unlockDate)) {
+        if (!isLetterUnlockedInTimeZone(found.unlockDate, LOCK_TIMEZONE)) {
           setLocked(true)
           setLockMessage(
             `Not yet, my love. Come back on ${formatDate(found.unlockDate)}.`
