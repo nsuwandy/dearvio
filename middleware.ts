@@ -11,7 +11,7 @@ function isProtectedApiRoute(pathname: string, method: string): boolean {
   return false
 }
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   if (!isAdminAuthEnabled()) {
     return NextResponse.next()
   }
@@ -25,7 +25,8 @@ export function middleware(request: NextRequest) {
   }
 
   const token = request.cookies.get(ADMIN_AUTH_COOKIE)?.value
-  if (isAdminSessionValid(token)) {
+  const isValid = await isAdminSessionValid(token)
+  if (isValid) {
     return NextResponse.next()
   }
 

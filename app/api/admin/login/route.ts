@@ -13,10 +13,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Incorrect password" }, { status: 401 })
     }
 
+    const token = await getAdminSessionToken()
     const response = NextResponse.json({ success: true })
     response.cookies.set({
       name: ADMIN_AUTH_COOKIE,
-      value: getAdminSessionToken(),
+      value: token,
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",

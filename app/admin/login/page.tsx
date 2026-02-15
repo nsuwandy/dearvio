@@ -1,11 +1,11 @@
 "use client"
 
-import { FormEvent, useState } from "react"
+import { FormEvent, useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 
-export default function AdminLoginPage() {
+function LoginForm() {
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -60,5 +60,13 @@ export default function AdminLoginPage() {
         </form>
       </div>
     </div>
+  )
+}
+
+export default function AdminLoginPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading...</div>}>
+      <LoginForm />
+    </Suspense>
   )
 }
