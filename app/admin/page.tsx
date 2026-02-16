@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import Link from "next/link"
 import { Save, RotateCcw, ChevronDown, ChevronUp, Settings, FileText, ImageIcon, Upload, Trash2, Archive, Pencil, FolderArchive, Plus, Check, X, Mic, Square } from "lucide-react"
 import {
   AlertDialog,
@@ -619,6 +620,14 @@ export default function AdminPage() {
                         }
                         className="border-border bg-background text-foreground"
                       />
+                    </div>
+
+                    <div>
+                      <Link href={`/admin/letter/${letter.day}`} target="_blank">
+                        <Button type="button" variant="outline" size="sm" className="border-border text-foreground hover:bg-secondary">
+                          Open Admin Preview
+                        </Button>
+                      </Link>
                     </div>
 
                     <div className="flex flex-col gap-1.5">
