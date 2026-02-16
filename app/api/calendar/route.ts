@@ -65,6 +65,9 @@ export async function POST(request: NextRequest) {
             title: `Day ${i + 1}`,
             body: `[Insert your letter for Day ${i + 1} here]\n\n[Write something meaningful for this day]\n\n[Add a memory, inside joke, or future dream]`,
             unlockDate: dateStr,
+            audioTitle: "",
+            audioUrl: "",
+            audioAttachmentText: "",
           }
         })
       }

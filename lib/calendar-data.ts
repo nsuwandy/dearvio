@@ -3,6 +3,11 @@ export interface Letter {
   title: string
   body: string
   unlockDate: string // ISO date string YYYY-MM-DD
+  audioTitle?: string
+  audioUrl?: string
+  // Legacy fallback from older local data-url storage
+  audioDataUrl?: string
+  audioAttachmentText?: string
 }
 
 export interface Archive {
@@ -36,6 +41,9 @@ export function getDefaultConfig(): CalendarConfig {
       title: `Day ${i + 1}`,
       body: `[Insert your letter for Day ${i + 1} here]\n\n[Write something meaningful for this day]\n\n[Add a memory, inside joke, or future dream]`,
       unlockDate: dateStr,
+      audioTitle: "",
+      audioUrl: "",
+      audioAttachmentText: "",
     }
   })
 

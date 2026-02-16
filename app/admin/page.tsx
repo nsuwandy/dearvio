@@ -1,11 +1,11 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Save, RotateCcw, ChevronDown, ChevronUp, Settings, FileText, ImageIcon, Upload, Trash2, Archive, Pencil, FolderArchive, Plus, Check, X } from "lucide-react"
+import { Save, RotateCcw, ChevronDown, ChevronUp, Settings, FileText, ImageIcon, Upload, Trash2, Archive, Pencil, FolderArchive, Plus, Check, X, Mic, Square } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +36,12 @@ export default function AdminPage() {
   const [renamingArchive, setRenamingArchive] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState("")
   const [deletingArchive, setDeletingArchive] = useState<string | null>(null)
+  const [recordingDay, setRecordingDay] = useState<number | null>(null)
+  const [uploadingAudioDay, setUploadingAudioDay] = useState<number | null>(null)
+  const [recordingError, setRecordingError] = useState("")
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const mediaStreamRef = useRef<MediaStream | null>(null)
+  const chunksRef = useRef<Blob[]>([])
 
   const fetchConfig = useCallback(async () => {
     try {
@@ -77,6 +83,24 @@ export default function AdminPage() {
     fetchSlideshow()
     fetchArchives()
   }, [fetchConfig, fetchSlideshow, fetchArchives])
+
+  function stopMediaTracks() {
+    if (!mediaStreamRef.current) return
+    mediaStreamRef.current.getTracks().forEach((track) => track.stop())
+    mediaStreamRef.current = null
+  }
+
+  function cleanupRecorder() {
+    mediaRecorderRef.current = null
+    chunksRef.current = []
+    stopMediaTracks()
+  }
+
+  useEffect(() => {
+    return () => {
+      cleanupRecorder()
+    }
+  }, [])
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -175,6 +199,125 @@ export default function AdminPage() {
     })
   }
 
+  function updateLetterFields(day: number, updates: Partial<Letter>) {
+    if (!config) return
+    setConfig({
+      ...config,
+      letters: config.letters.map((l) => (l.day === day ? { ...l, ...updates } : l)),
+    })
+  }
+
+  async function uploadRecordedAudio(day: number, blob: Blob, previousUrl?: string) {
+    const fileExt = blob.type.includes("mp4") ? "m4a" : "webm"
+    const file = new File([blob], `letter-${day}-${Date.now()}.${fileExt}`, {
+      type: blob.type || "audio/webm",
+    })
+    const formData = new FormData()
+    formData.append("file", file)
+    if (previousUrl) {
+      formData.append("previousUrl", previousUrl)
+    }
+
+    const res = await fetch("/api/letter-audio", {
+      method: "POST",
+      body: formData,
+    })
+
+    if (!res.ok) {
+      throw new Error("Failed to upload recording")
+    }
+
+    const data = await res.json()
+    if (!data?.url || typeof data.url !== "string") {
+      throw new Error("Invalid upload response")
+    }
+    return data.url as string
+  }
+
+  async function startRecording(day: number, previousAudioUrl?: string) {
+    if (recordingDay !== null) return
+    setRecordingError("")
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      mediaStreamRef.current = stream
+
+      const mimeTypes = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/mp4",
+      ]
+      const supportedType = mimeTypes.find((type) => MediaRecorder.isTypeSupported(type))
+      const recorder = supportedType
+        ? new MediaRecorder(stream, { mimeType: supportedType })
+        : new MediaRecorder(stream)
+
+      mediaRecorderRef.current = recorder
+      chunksRef.current = []
+      setRecordingDay(day)
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunksRef.current.push(event.data)
+        }
+      }
+
+      recorder.onerror = () => {
+        setRecordingError("Recording failed. Please try again.")
+      }
+
+      recorder.onstop = async () => {
+        try {
+          const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" })
+          if (blob.size > 0) {
+            setUploadingAudioDay(day)
+            const audioUrl = await uploadRecordedAudio(day, blob, previousAudioUrl)
+            updateLetterFields(day, { audioUrl, audioDataUrl: "" })
+          }
+        } catch {
+          setRecordingError("Failed to upload recording. Please try again.")
+        } finally {
+          setUploadingAudioDay(null)
+          cleanupRecorder()
+          setRecordingDay(null)
+        }
+      }
+
+      recorder.start()
+    } catch {
+      cleanupRecorder()
+      setRecordingDay(null)
+      setRecordingError("Microphone access was denied or unavailable.")
+    }
+  }
+
+  function stopRecording() {
+    if (!mediaRecorderRef.current) return
+    if (mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop()
+      return
+    }
+    cleanupRecorder()
+    setRecordingDay(null)
+  }
+
+  async function handleRemoveAudio(day: number, url?: string) {
+    setRecordingError("")
+
+    if (url) {
+      try {
+        await fetch("/api/letter-audio", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        })
+      } catch (err) {
+        console.error("Failed to delete audio from blob:", err)
+      }
+    }
+
+    updateLetterFields(day, { audioTitle: "", audioUrl: "", audioDataUrl: "", audioAttachmentText: "" })
+  }
+
   async function handleCreateArchive() {
     if (!config) return
     setArchiving(true)
@@ -245,6 +388,9 @@ export default function AdminPage() {
           title: `Day ${i + 1}`,
           body: `[Insert your letter for Day ${i + 1} here]\n\n[Write something meaningful for this day]\n\n[Add a memory, inside joke, or future dream]`,
           unlockDate: date.toISOString().split("T")[0],
+          audioTitle: "",
+          audioUrl: "",
+          audioAttachmentText: "",
         })
       }
     } else {
@@ -477,6 +623,90 @@ export default function AdminPage() {
                           updateLetter(letter.day, "body", e.target.value)
                         }
                         rows={8}
+                        className="border-border bg-background text-foreground resize-y"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-background/40 p-3">
+                      <Label className="text-foreground">Audio Recording</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Record a voice message for this letter. Save changes after recording.
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {recordingDay === letter.day ? (
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={stopRecording}
+                            disabled={uploadingAudioDay === letter.day}
+                          >
+                            <Square className="mr-1.5 h-3.5 w-3.5" />
+                            Stop Recording
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() =>
+                              startRecording(letter.day, letter.audioUrl || letter.audioDataUrl)
+                            }
+                            disabled={recordingDay !== null || uploadingAudioDay === letter.day}
+                            className="bg-primary text-primary-foreground hover:bg-blush/80"
+                          >
+                            <Mic className="mr-1.5 h-3.5 w-3.5" />
+                            {uploadingAudioDay === letter.day ? "Uploading..." : "Record Audio"}
+                          </Button>
+                        )}
+
+                        {(letter.audioUrl || letter.audioDataUrl) && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRemoveAudio(letter.day, letter.audioUrl)}
+                            className="border-border text-foreground hover:bg-secondary"
+                          >
+                            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                            Remove Audio
+                          </Button>
+                        )}
+                      </div>
+
+                      {recordingDay === letter.day && (
+                        <p className="text-xs font-medium text-blush">Recording in progress...</p>
+                      )}
+
+                      {recordingError && (
+                        <p className="text-xs text-destructive">{recordingError}</p>
+                      )}
+
+                      {(letter.audioUrl || letter.audioDataUrl) && (
+                        <audio controls src={letter.audioUrl || letter.audioDataUrl} className="w-full" />
+                      )}
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <Label className="text-foreground">Audio Title</Label>
+                      <Input
+                        value={letter.audioTitle || ""}
+                        onChange={(e) =>
+                          updateLetter(letter.day, "audioTitle", e.target.value)
+                        }
+                        placeholder="Example: A message from me"
+                        className="border-border bg-background text-foreground"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <Label className="text-foreground">Audio Attachment Text (Expandable)</Label>
+                      <Textarea
+                        value={letter.audioAttachmentText || ""}
+                        onChange={(e) =>
+                          updateLetter(letter.day, "audioAttachmentText", e.target.value)
+                        }
+                        rows={4}
+                        placeholder="Optional message shown in an expandable section below the audio player."
                         className="border-border bg-background text-foreground resize-y"
                       />
                     </div>

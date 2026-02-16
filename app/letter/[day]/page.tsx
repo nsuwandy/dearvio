@@ -121,6 +121,30 @@ export default function LetterPage({ params }: { params: Promise<{ day: string }
 
             <div className="mx-auto mb-6 h-px w-16 bg-gold/40 sm:mb-8 sm:w-24" />
 
+            {(letter.audioUrl || letter.audioDataUrl) && (
+              <section className="mb-6 rounded-xl border border-border/70 bg-background/40 p-4 sm:mb-8">
+                <p className="mb-2 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                  {letter.audioTitle?.trim() || "Voice Recording"}
+                </p>
+                <audio controls src={letter.audioUrl || letter.audioDataUrl} className="w-full" />
+
+                {letter.audioAttachmentText?.trim() && (
+                  <details className="mt-3 rounded-lg border border-border/60 bg-card/70 p-3">
+                    <summary className="cursor-pointer text-sm font-medium text-foreground">
+                      Open attached note
+                    </summary>
+                    <div className="mt-3 space-y-2">
+                      {letter.audioAttachmentText.split("\n").map((line, i) => (
+                        <p key={i} className="text-sm leading-relaxed text-foreground/85">
+                          {line || "\u00A0"}
+                        </p>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </section>
+            )}
+
             <div className="prose prose-sm mx-auto max-w-none sm:prose-base">
               {letter.body.split("\n").map((line, i) => (
                 <p
