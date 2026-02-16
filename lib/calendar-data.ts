@@ -19,7 +19,8 @@ export interface CalendarConfig {
   letters: Letter[]
 }
 
-const SITE_TIME_ZONE = process.env.NEXT_PUBLIC_SITE_TIME_ZONE || "UTC"
+const SITE_TIME_ZONE = process.env.NEXT_PUBLIC_SITE_TIME_ZONE || "Asia/Tokyo"
+const UNLOCK_HOUR = 8
 
 export function getDefaultConfig(): CalendarConfig {
   const startDate = "2026-03-01"
@@ -56,6 +57,8 @@ export function isLetterUnlocked(unlockDate: string): boolean {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
+      hour: "2-digit",
+      hourCycle: "h23",
     }).formatToParts(now)
   } catch {
     parts = new Intl.DateTimeFormat("en-US", {
@@ -63,17 +66,23 @@ export function isLetterUnlocked(unlockDate: string): boolean {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
+      hour: "2-digit",
+      hourCycle: "h23",
     }).formatToParts(now)
   }
 
   const year = parts.find((p) => p.type === "year")?.value
   const month = parts.find((p) => p.type === "month")?.value
   const day = parts.find((p) => p.type === "day")?.value
+  const hour = parts.find((p) => p.type === "hour")?.value
 
-  if (!year || !month || !day) return false
+  if (!year || !month || !day || !hour) return false
 
   const todayInSiteTimeZone = `${year}-${month}-${day}`
-  return todayInSiteTimeZone >= unlockDate
+  if (todayInSiteTimeZone > unlockDate) return true
+  if (todayInSiteTimeZone < unlockDate) return false
+
+  return Number(hour) >= UNLOCK_HOUR
 }
 
 export function formatDate(dateStr: string): string {
