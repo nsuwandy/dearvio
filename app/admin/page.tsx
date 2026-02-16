@@ -234,6 +234,24 @@ export default function AdminPage() {
     return data.url as string
   }
 
+  async function handleAudioFileUpload(
+    day: number,
+    file: File | null,
+    previousAudioUrl?: string
+  ) {
+    if (!file) return
+    setRecordingError("")
+    setUploadingAudioDay(day)
+    try {
+      const audioUrl = await uploadRecordedAudio(day, file, previousAudioUrl)
+      updateLetterFields(day, { audioUrl, audioDataUrl: "" })
+    } catch {
+      setRecordingError("Failed to upload audio file. Please try again.")
+    } finally {
+      setUploadingAudioDay(null)
+    }
+  }
+
   async function startRecording(day: number, previousAudioUrl?: string) {
     if (recordingDay !== null) return
     setRecordingError("")
@@ -630,7 +648,7 @@ export default function AdminPage() {
                     <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-background/40 p-3">
                       <Label className="text-foreground">Audio Recording</Label>
                       <p className="text-xs text-muted-foreground">
-                        Record a voice message for this letter. Save changes after recording.
+                        Record a voice message or upload an audio file. Save changes after upload.
                       </p>
                       <div className="flex flex-wrap items-center gap-2">
                         {recordingDay === letter.day ? (
@@ -658,6 +676,32 @@ export default function AdminPage() {
                             {uploadingAudioDay === letter.day ? "Uploading..." : "Record Audio"}
                           </Button>
                         )}
+
+                        <label
+                          htmlFor={`audio-upload-${letter.day}`}
+                          className={`inline-flex h-9 cursor-pointer items-center justify-center rounded-md border border-border px-3 text-sm font-medium transition-colors ${
+                            recordingDay !== null || uploadingAudioDay === letter.day
+                              ? "pointer-events-none opacity-50"
+                              : "text-foreground hover:bg-secondary"
+                          }`}
+                        >
+                          Upload Audio File
+                        </label>
+                        <input
+                          id={`audio-upload-${letter.day}`}
+                          type="file"
+                          accept="audio/*"
+                          className="hidden"
+                          disabled={recordingDay !== null || uploadingAudioDay === letter.day}
+                          onChange={async (e) => {
+                            await handleAudioFileUpload(
+                              letter.day,
+                              e.target.files?.[0] ?? null,
+                              letter.audioUrl || letter.audioDataUrl
+                            )
+                            e.target.value = ""
+                          }}
+                        />
 
                         {(letter.audioUrl || letter.audioDataUrl) && (
                           <Button
